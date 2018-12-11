@@ -1,0 +1,5 @@
+{total = total + $2; used = used + $3; free = free + $4; printf("%s\t%d\t%-25s%d\t%d\t%d%%\n", date, 1, $6, $2, $4, $5);}
+END {
+    percent = used * 100 / total;
+    printf("%s\t%d\t%-25s%d\t%d\t%d%%\n", date, 0, "disk", total, free, percent);
+}
