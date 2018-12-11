@@ -8,6 +8,12 @@
 #ifndef _CLIENT_H
 #define _CLIENT_H
 
+#include <pthread.h>
+#include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <dirent.h>
@@ -21,13 +27,8 @@
 #include <sys/wait.h>
 #include <sys/file.h>
 #include <signal.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <time.h>
 #include <stdarg.h>
-#include <sys/stat.h>
-
 
 
 #endif
