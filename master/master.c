@@ -182,16 +182,17 @@ int connect_client(Node *p) {
         close(sockfd);
         return 0;
     }
-    close(sockfd);
-    return 1;
+    //close(sockfd);
+    return sockfd;
 }
 
 // 遍历链表, 判断是否可以连接到客户端, 连接不到的删除
 void connect_or_delete(LinkedList head, int pid) {
     if (head->next == 0) return ;
     Node *p = head->next, *temp;
+    int sockfd;
     while (p) {
-        if (connect_client(p) == 0) {
+        if ((sockfd = connect_client(p)) == 0) {
             //printf("connect error\n");
             temp = p->next;
             pthread_mutex_lock(&mut[pid]);
@@ -199,6 +200,8 @@ void connect_or_delete(LinkedList head, int pid) {
             pthread_mutex_unlock(&mut[pid]);
             p = temp;
         } else {
+            // 收文件
+            
             p = p->next;
         }
     }
