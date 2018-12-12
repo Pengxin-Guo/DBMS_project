@@ -11,6 +11,7 @@
 
 #define INS 5
 #define PORT 33333                                             // 建立的监听端口
+#define MAX_SIZE 1024                                          // 每次接收文件的最长字节长度
 
 void *func(void *);
 
@@ -186,12 +187,53 @@ int connect_client(Node *p) {
     return sockfd;
 }
 
+char file_log[6][20] = {"Mem.log", "Disk.log", "CPU.log", "Sys.log", "User.log", "MPD.log"};
+
+// 收文件
+void recv_file(int sockfd, char *str, Node *p) {
+    int recode;
+    while (1) {
+        if (recv(sockfd, &recode, 4, 0) <= 0) {
+            perror("recv");
+            printf("xxxxxxx%d\n", recode);
+            break ;
+        }
+        printf("receive recode %d\n", recode);
+        int server_temp = connect_client(p);
+        if (server_temp == 0) {
+            perror("connect");
+            //close(server_temp);
+            continue ;
+        }
+        char buffer[MAX_SIZE];
+        char addr[80];
+        sprintf(addr, "%s/%s", str, file_log[recode - 100]);
+        printf("start receive file %s\n", addr);
+        FILE *file = fopen(addr, "a+");
+        if (file == NULL) {
+            fclose(file);
+            continue ;
+        }
+        int a;
+        while ((a = recv(server_temp, buffer, MAX_SIZE - 1, 0)) > 0) {
+            fprintf(file, "%s", buffer + 1);
+            memset(buffer, 0, sizeof(buffer));
+        }
+        printf("finish receive file %s\n", addr);
+        fclose(file);
+        close(server_temp);
+    }
+    return ;
+}
+
+
 // 遍历链表, 判断是否可以连接到客户端, 连接不到的删除
 void connect_or_delete(LinkedList head, int pid) {
     if (head->next == 0) return ;
     Node *p = head->next, *temp;
     int sockfd;
     while (p) {
+        printf("%s\n", inet_ntoa(p->addr.sin_addr));
         if ((sockfd = connect_client(p)) == 0) {
             //printf("connect error\n");
             temp = p->next;
@@ -200,10 +242,18 @@ void connect_or_delete(LinkedList head, int pid) {
             pthread_mutex_unlock(&mut[pid]);
             p = temp;
         } else {
-            // 收文件
-            
+            char str[50] = {"./Log/"};
+            char ip[50];
+            strcpy(ip, inet_ntoa(p->addr.sin_addr));
+            strcat(str, ip);
+            if (opendir(str) == NULL) {
+                mkdir(str, 0755);
+            }
+            printf("xxx\n");
+            recv_file(sockfd, str, p);                               // 收文件
             p = p->next;
         }
+        close(sockfd);
     }
     return ; 
 }
@@ -266,8 +316,8 @@ int main() {
         p->next = NULL;
         pthread_mutex_lock(&mut[sub]);
         insert(linkedlist[sub], p, queue[sub]);
-        pthread_mutex_unlock(&mut[sub]);
         queue[sub]++;
+        pthread_mutex_unlock(&mut[sub]);
         printf("insert into %d linkedlist\n", sub);
         output(linkedlist[sub], sub);
         close(socketfd);
@@ -288,6 +338,7 @@ void *func(void *argv) {
     para = (Mypara *)argv;
     while (1) {
         connect_or_delete(linkedlist[para->num], para->num);
+        printf("id = %d\n", para->num);
         sleep(2);
     }
     return NULL;
