@@ -10,9 +10,9 @@
 #include "./client.h"
 #define PORT 33333                                                    // master端开的端口
 #define PORT1 9999                                                    // client端开的端口
-#define host "192.168.1.157"                                          // master端的ip
+#define host "192.168.1.158"                                          // master端的ip
 #define INS 6                                                         // 脚本个数
-
+#define MAX_SIZE 1024                                                 // 单次发送文件的最大字节数
 
 int create_listen(int port) {
     int server_listen;
@@ -39,18 +39,10 @@ int create_listen(int port) {
 
 pthread_mutex_t mut[INS + 1];                                         // 用于给6个脚本得出来的结果文件加锁
 int num[INS + 1];                                                     // num[i]代表线程的编号
-char file_log[INS][20] = {"./Log/Mem.log", 
-                        "./Log/Disk.log", 
-                        "./Log/CPU.log", 
-                        "./Log/Sys.log",
-                        "./Log/User.log",
-                         "./Log/MPD.log"};
-char script_name[][50] = {"bash ../shell/MemLog.sh 20", 
-                           "bash ../shell/DiskLog.sh", 
-                           "bash ../shell/CPULog.sh", 
-                           "bash ../shell/SysInfo.sh",
-                           "bash ../shell/Users.sh",
-                           "bash ../shell/MPD.sh"};
+char file_log[INS][20] = {"./Log/Mem.log", "./Log/Disk.log", "./Log/CPU.log", 
+                        "./Log/Sys.log", "./Log/User.log", "./Log/MPD.log"};
+char script_name[][50] = {"bash ../shell/MemLog.sh 20", "bash ../shell/DiskLog.sh", "bash ../shell/CPULog.sh", 
+                           "bash ../shell/SysInfo.sh", "bash ../shell/Users.sh", "bash ../shell/MPD.sh"};
 int sleep_time[INS] = {5, 5, 5, 5, 5, 5};
 
 void *func(void *argv) {
@@ -60,6 +52,7 @@ void *func(void *argv) {
     //printf("%d : %s\n", i, command);
     while(1) {
         pthread_mutex_lock(&mut[i]);
+        printf("pthread %d run shell %s\n", i, script_name[i]);
         system(command);
         pthread_mutex_unlock(&mut[i]);
         sleep(sleep_time[i]);
@@ -68,6 +61,7 @@ void *func(void *argv) {
 
 // 开6个线程, 运行6个脚本, 并且将6个脚本的运行结果存储到6个.log文件中
 void run_shell() {
+    printf("Run shell started!\n");
     pthread_t t[INS + 1];
     for (int i = 0; i < INS; i++) {
         num[i] = i;
@@ -75,34 +69,79 @@ void run_shell() {
             printf("pthread_create is error\n");
             exit(1);
         }
-        sleep(1);
     }
 }
 
 // 将6个.log文件传给master端
 void send_file(int socketfd, int client_listen) {
-    struct sockaddr_in server_addr;
-    socklen_t len = sizeof(server_addr);
+    for (int i = 100; i < 100 + INS; i++) {
+        printf("start send recode %d\n", i);
+        if (send(socketfd, &i, 4, 0) < 0) {
+            perror("send");
+            continue ;
+        }
+        printf("finish send recode %d\n", i);
+        struct sockaddr_in server_short;
+        socklen_t len = sizeof(server_short);
+        int client_short;
+        if ((client_short = accept(client_listen, (struct sockaddr *)&server_short, &len)) < 0) {
+            close(client_short);
+            continue ;
+        }
+        FILE *file;
+        char buffer[MAX_SIZE];
+        pthread_mutex_lock(&mut[i - 100]);
+        if ((file = fopen(file_log[i - 100], "rb")) == NULL) {
+            perror("fileopen error");
+            pthread_mutex_unlock(&mut[i - 100]);
+            continue ;
+        }
+        printf("start send file %s\n", file_log[i - 100]);
+        while (!feof(file)) {
+            fread(buffer, sizeof(char), MAX_SIZE - 1, file);
+            send(client_short, buffer, strlen(buffer), 0);
+            memset(buffer, 0, sizeof(buffer));
+        }
+        printf("finish send file %s\n", file_log[i - 100]);
+        fclose(file);
+        char command[50] = {0};
+        printf("start clear file %s\n", file_log[i - 100]);
+        sprintf(command, "%s > %s\0", "", file_log[i - 100]);
+        system(command);
+        printf("finish clear file %s\n", file_log[i - 100]);
+        pthread_mutex_unlock(&mut[i - 100]);
+        close(client_short);
+    }
+    return ;
 }
 
-int main () {
-    run_shell();                                                      // 开6个线程, 运行6个脚本
-    int sock_client;
-    struct sockaddr_in dest_addr; 
-    if ((sock_client = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("Socket");
-        return -1;
-    }
-    dest_addr.sin_family = AF_INET;
-    dest_addr.sin_port = htons(PORT);
-    dest_addr.sin_addr.s_addr = inet_addr(host);
-    if (connect(sock_client, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
-        perror("Connect");
+// 心跳, 告诉master端自己上线了
+void *heart(void *argv) {
+    while (1) {
+        int sock_client;
+        struct sockaddr_in dest_addr;
+        if ((sock_client = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            perror("Socket");
+            close(sock_client);
+        }
+        dest_addr.sin_family = AF_INET;
+        dest_addr.sin_port = htons(PORT);
+        dest_addr.sin_addr.s_addr = inet_addr(host);
+        if (connect(sock_client, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
+            perror("Connect");
+            close(sock_client);
+        } else printf ("Connect success!\n");
         close(sock_client);
-        exit(0);
-    } else printf ("Connect success!\n");
-    close(sock_client);
-
+        sleep(5);
+    }
+}
+int main () {
+    pthread_t t;
+    if (pthread_create(&t, NULL, heart, NULL) == -1) {
+        printf("pthread_create is error\n");
+        exit(1);
+    }
+    run_shell();                                                      // 开6个线程, 运行6个脚本
     int client_listen = create_listen(PORT1);
     while (1) {
         struct sockaddr_in server_addr;
@@ -115,6 +154,6 @@ int main () {
         send_file(socketfd, client_listen);                           // 将6个.log文件传给master端
 	    close(socketfd);
     }
-    close (client_listen);
+    close(client_listen);
     return 0;
 }
