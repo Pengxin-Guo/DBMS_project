@@ -66,6 +66,7 @@ void *func(void *argv) {
     }
 }
 
+// 开6个线程, 运行6个脚本, 并且将6个脚本的运行结果存储到6个.log文件中
 void run_shell() {
     pthread_t t[INS + 1];
     for (int i = 0; i < INS; i++) {
@@ -76,6 +77,12 @@ void run_shell() {
         }
         sleep(1);
     }
+}
+
+// 将6个.log文件传给master端
+void send_file(int socketfd, int client_listen) {
+    struct sockaddr_in server_addr;
+    socklen_t len = sizeof(server_addr);
 }
 
 int main () {
@@ -105,7 +112,7 @@ int main () {
             perror("accept failed!");
 	        continue;
         }
-        // 传文件
+        send_file(socketfd, client_listen);                           // 将6个.log文件传给master端
 	    close(socketfd);
     }
     close (client_listen);
