@@ -39,16 +39,10 @@ void init_linkedlist(int n) {
     return ;
 }
 
-// 在链表head的尾部插入节点node
-void insert(LinkedList head, Node *node, int index) {
-    Node *p = head;
-    while (p && index) {
-        p = p->next;
-        --index;
-    }
-    if (index == 0) {
-        p->next = node;
-    }
+// 在链表head的头部插入节点node
+void insert(LinkedList head, Node *node) {
+    node->next = head->next;
+    head->next = node;
     return ;
 }
 
@@ -194,8 +188,6 @@ void recv_file(int sockfd, char *str, Node *p) {
     int recode;
     while (1) {
         if (recv(sockfd, &recode, 4, 0) <= 0) {
-            perror("recv");
-            printf("xxxxxxx%d\n", recode);
             break ;
         }
         printf("receive recode %d\n", recode);
@@ -229,18 +221,22 @@ void recv_file(int sockfd, char *str, Node *p) {
 
 // 遍历链表, 判断是否可以连接到客户端, 连接不到的删除
 void connect_or_delete(LinkedList head, int pid) {
-    if (head->next == 0) return ;
-    Node *p = head->next, *temp;
+    if (head->next == NULL) {
+        //printf("NULL %d\n", pid);
+        return ;
+    }
+    Node *p, *temp;
+    p = head->next;
     int sockfd;
     while (p) {
-        printf("%s\n", inet_ntoa(p->addr.sin_addr));
+        //printf("%s\n", inet_ntoa(p->addr.sin_addr));
         if ((sockfd = connect_client(p)) == 0) {
             //printf("connect error\n");
-            temp = p->next;
             pthread_mutex_lock(&mut[pid]);
+            temp = p->next;
             delete_node(head, p, pid);
-            pthread_mutex_unlock(&mut[pid]);
             p = temp;
+            pthread_mutex_unlock(&mut[pid]);
         } else {
             char str[50] = {"./Log/"};
             char ip[50];
@@ -249,9 +245,10 @@ void connect_or_delete(LinkedList head, int pid) {
             if (opendir(str) == NULL) {
                 mkdir(str, 0755);
             }
-            printf("xxx\n");
+            pthread_mutex_lock(&mut[pid]);
             recv_file(sockfd, str, p);                               // 收文件
             p = p->next;
+            pthread_mutex_unlock(&mut[pid]);
         }
         close(sockfd);
     }
@@ -279,7 +276,7 @@ int main() {
         p = (Node *)malloc(sizeof(Node));
         p->addr = addr;
         p->next = NULL;
-        insert(linkedlist[sub], p, queue[sub]);
+        insert(linkedlist[sub], p);
         queue[sub]++;
     }
     /*
@@ -315,7 +312,7 @@ int main() {
         p->addr = client_addr;
         p->next = NULL;
         pthread_mutex_lock(&mut[sub]);
-        insert(linkedlist[sub], p, queue[sub]);
+        insert(linkedlist[sub], p);
         queue[sub]++;
         pthread_mutex_unlock(&mut[sub]);
         printf("insert into %d linkedlist\n", sub);
@@ -338,7 +335,7 @@ void *func(void *argv) {
     para = (Mypara *)argv;
     while (1) {
         connect_or_delete(linkedlist[para->num], para->num);
-        printf("id = %d\n", para->num);
+        //printf("id = %d\n", para->num);
         sleep(2);
     }
     return NULL;
