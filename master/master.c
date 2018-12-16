@@ -11,6 +11,7 @@
 
 #define INS 5
 #define PORT 33333                                             // 建立的监听端口
+#define PORT1 33334                                            // 用来接收警报信息开的端口
 #define MAX_SIZE 1024                                          // 每次接收文件的最长字节长度
 
 void *func(void *);
@@ -255,6 +256,22 @@ void connect_or_delete(LinkedList head, int pid) {
     return ; 
 }
 
+// 接收警报信息的函数
+void *warn_func(void *argv) {
+    int server_listen = create_listen(PORT1);
+    while (1) {
+        struct sockaddr_in client_addr;
+        socklen_t len = sizeof(client_addr);
+        int socketfd;
+        if ((socketfd = accept(server_listen, (struct sockaddr*)&client_addr, &len)) < 0) {
+            perror("accept error");
+            close(socketfd);
+            continue;
+        }
+    }
+    return NULL;
+}
+
 int main() {
     //freopen("in.in", "r", stdin);
     init_linkedlist(INS);
@@ -293,6 +310,11 @@ int main() {
             exit(1);
         }
     }
+    pthread_t warn;                                       // 开一个线程, 用来接收警报信息
+    if (pthread_create(&warn, NULL, warn_func, NULL) == -1) {
+        printf("error\n");
+        exit(1);
+    }
     int server_listen = create_listen(PORT);
     while (1) {
         struct sockaddr_in client_addr;
@@ -300,6 +322,7 @@ int main() {
         int socketfd;
         if ((socketfd = accept(server_listen, (struct sockaddr*)&client_addr, &len)) < 0) {
             perror("accept error");
+            close(socketfd);
             continue;
         }
         if (exist(client_addr)) {
