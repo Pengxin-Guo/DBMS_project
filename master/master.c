@@ -273,7 +273,27 @@ void *warn_func(void *argv) {
         if (opendir(str) == NULL) {
             mkdir(str, 0755);
         }
-
+        int recode;
+        if (recv(server_temp, &recode, 4, 0) <= 0) {
+            break;
+        }
+        char addr[50];
+        sprintf(addr, "%s/%s", str, file_log[recode]);
+        printf("start receive warning file %s\n", addr);
+        FILE *file = fopen(addr, "a+");
+        if (file == NULL) {
+            fclose(file);
+            continue ;
+        }
+        int a;
+        char buffer[MAX_SIZE];
+        while ((a = recv(server_temp, buffer, MAX_SIZE - 1, 0)) > 0) {
+            fprintf(file, "%s", buffer + 1);
+            memset(buffer, 0, sizeof(buffer));
+        }
+        printf("finish receive warning file %s\n", addr);
+        fclose(file);
+        close(server_temp);
     }
     return NULL;
 }
