@@ -10,6 +10,7 @@
 #include "./client.h"
 #define PORT 33333                                                    // master端开的端口
 #define PORT1 9999                                                    // client端开的端口
+#define PORT2 33334                                                   // master端开的接收警报信息的端口
 #define host "192.168.1.158"                                          // master端的ip
 #define INS 6                                                         // 脚本个数
 #define MAX_SIZE 1024                                                 // 单次发送文件的最大字节数
