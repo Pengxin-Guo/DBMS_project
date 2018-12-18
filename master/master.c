@@ -258,16 +258,22 @@ void connect_or_delete(LinkedList head, int pid) {
 
 // 接收警报信息的函数
 void *warn_func(void *argv) {
-    int server_listen = create_listen(PORT1);
+    int warn_listen = create_listen(PORT1);
+    int server_temp;
+    struct sockaddr_in client_addr;
+    socklen_t len = sizeof(client_addr);
     while (1) {
-        struct sockaddr_in client_addr;
-        socklen_t len = sizeof(client_addr);
-        int socketfd;
-        if ((socketfd = accept(server_listen, (struct sockaddr*)&client_addr, &len)) < 0) {
+        if ((server_temp = accept(warn_listen, (struct sockaddr*)&client_addr, &len)) < 0) {
             perror("accept error");
-            close(socketfd);
+            close(server_temp);
             continue;
         }
+        char str[50] = "./Log/Warning/";
+        strcat(str, inet_ntoa(client_addr.sin_addr));
+        if (opendir(str) == NULL) {
+            mkdir(str, 0755);
+        }
+
     }
     return NULL;
 }
