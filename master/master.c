@@ -285,12 +285,9 @@ void *warn_func(void *argv) {
             fclose(file);
             continue ;
         }
-        int a;
         char buffer[MAX_SIZE];
-        while ((a = recv(server_temp, buffer, MAX_SIZE - 1, 0)) > 0) {
-            fprintf(file, "%s", buffer + 1);
-            memset(buffer, 0, sizeof(buffer));
-        }
+        recv(server_temp, buffer, MAX_SIZE, 0);
+        fwrite(buffer, strlen(buffer), 1, file);
         printf("finish receive warning file %s\n", addr);
         fclose(file);
         close(server_temp);
@@ -336,6 +333,7 @@ int main() {
             exit(1);
         }
     }
+    sleep(10);                                            // 睡10秒, 等待队列初始化完成
     pthread_t warn;                                       // 开一个线程, 用来接收警报信息
     if (pthread_create(&warn, NULL, warn_func, NULL) == -1) {
         printf("error\n");

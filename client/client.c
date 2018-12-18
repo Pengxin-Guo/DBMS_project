@@ -46,15 +46,57 @@ char script_name[][50] = {"bash ../shell/MemLog.sh 20", "bash ../shell/DiskLog.s
                            "bash ../shell/SysInfo.sh", "bash ../shell/Users.sh", "bash ../shell/MPD.sh"};
 int sleep_time[INS] = {5, 5, 5, 5, 5, 5};
 
+// 检测是否有报警信息
+void warning_detecte(int num, char *buffer) {
+    if (num == 4) {
+        if (strstr(buffer, "warning") == NULL) return ;
+    } else if (num == 5) {
+        if (!buffer[0]) return ;
+    }
+    int warning_sock;
+    struct sockaddr_in warning_addr;
+    if ((warning_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Socket");
+        close(warning_sock);
+        return ;
+    }
+    warning_addr.sin_family=  AF_INET;
+    warning_addr.sin_port = htons(PORT2);
+    warning_addr.sin_addr.s_addr = inet_addr(host);
+    if (connect(warning_sock, (struct sockaddr *)&warning_addr, sizeof(warning_addr)) < 0) {
+        perror("socket");
+        sleep(10);
+        close(warning_sock);
+        return ;
+    } else {
+        send(warning_sock, &num, 4, 0);
+        send(warning_sock, buffer, strlen(buffer), 0);
+        close(warning_sock);
+    }
+    return ;
+}
+
 void *func(void *argv) {
-    int i = *((int *)argv);
-    char command[50] = {0};
-    sprintf(command, "%s >> %s\0", script_name[i], file_log[i]);
-    //printf("%d : %s\n", i, command);
+    int i = *((int *)argv), parameter = 0;
+    char buffer[MAX_SIZE] = {0};
     while(1) {
-        pthread_mutex_lock(&mut[i]);
         printf("pthread %d run shell %s\n", i, script_name[i]);
-        system(command);
+        FILE *fp;
+        if ((fp = popen(script_name[i], "r")) == NULL) {
+            perror("fail to popen");
+            break ;
+        }
+        pthread_mutex_lock(&mut[i]);
+        FILE *fp1 = fopen(file_log[i], "a+");
+        if (fread(buffer, 1, MAX_SIZE, fp)) {
+            if (i == 3 || i == 5) {
+                warning_detecte(i, buffer);
+            }
+            fwrite(buffer, 1, strlen(buffer), fp1);
+            memset(buffer, 0, MAX_SIZE);
+        }
+        fclose(fp1);
+        fclose(fp);
         pthread_mutex_unlock(&mut[i]);
         sleep(sleep_time[i]);
     }
@@ -131,6 +173,7 @@ void *heart(void *argv) {
         if (connect(sock_client, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
             perror("Connect");
             close(sock_client);
+            return NULL;
         } else printf ("Connect success!\n");
         close(sock_client);
         sleep(5);
