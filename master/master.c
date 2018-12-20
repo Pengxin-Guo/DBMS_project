@@ -116,8 +116,8 @@ int create_listen(int port) {
 	my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     //bzero(&(my_addr.sin_zero), sizeof(my_addr)); 
     if (bind(server_listen, (struct sockaddr*)&my_addr, sizeof(struct sockaddr)) < 0) {
-		perror("bind error");
-        close(server_listen);
+		close(server_listen);
+        perror("bind error");
 		return -1;
 	}
     if (listen(server_listen, 20) < 0) {
@@ -194,8 +194,8 @@ void recv_file(int sockfd, char *str, Node *p) {
         printf("receive recode %d\n", recode);
         int server_temp = connect_client(p);
         if (server_temp == 0) {
+            close(server_temp);
             perror("connect");
-            //close(server_temp);
             continue ;
         }
         char buffer[MAX_SIZE];
@@ -243,9 +243,7 @@ void connect_or_delete(LinkedList head, int pid) {
             char ip[50];
             strcpy(ip, inet_ntoa(p->addr.sin_addr));
             strcat(str, ip);
-            if (opendir(str) == NULL) {
-                mkdir(str, 0755);
-            }
+            mkdir(str, 0755);
             pthread_mutex_lock(&mut[pid]);
             recv_file(sockfd, str, p);                               // 收文件
             p = p->next;
@@ -264,18 +262,17 @@ void *warn_func(void *argv) {
     socklen_t len = sizeof(client_addr);
     while (1) {
         if ((server_temp = accept(warn_listen, (struct sockaddr*)&client_addr, &len)) < 0) {
-            perror("accept error");
             close(server_temp);
+            perror("accept error");
             continue;
         }
         char str[50] = "./Log/Warning/";
         strcat(str, inet_ntoa(client_addr.sin_addr));
-        if (opendir(str) == NULL) {
-            mkdir(str, 0755);
-        }
+        mkdir(str, 0755);
         int recode;
         if (recv(server_temp, &recode, 4, 0) <= 0) {
-            break;
+            close(server_temp);
+            continue ;
         }
         char addr[50];
         sprintf(addr, "%s/%s", str, file_log[recode]);
@@ -283,6 +280,7 @@ void *warn_func(void *argv) {
         FILE *file = fopen(addr, "a+");
         if (file == NULL) {
             fclose(file);
+            close(server_temp);
             continue ;
         }
         char buffer[MAX_SIZE];
@@ -292,6 +290,7 @@ void *warn_func(void *argv) {
         fclose(file);
         close(server_temp);
     }
+    close(warn_listen);
     return NULL;
 }
 
@@ -345,11 +344,12 @@ int main() {
         socklen_t len = sizeof(client_addr);
         int socketfd;
         if ((socketfd = accept(server_listen, (struct sockaddr*)&client_addr, &len)) < 0) {
-            perror("accept error");
             close(socketfd);
+            perror("accept error");
             continue;
         }
         if (exist(client_addr)) {
+            close(socketfd);
             printf("already exists\n");
             continue;
         }
@@ -366,7 +366,7 @@ int main() {
         output(linkedlist[sub], sub);
         close(socketfd);
     }
-    //close(server_listen);
+    close(server_listen);
     /*
     pthread_join(t[0], NULL);
     pthread_join(t[1], NULL);
@@ -383,7 +383,7 @@ void *func(void *argv) {
     while (1) {
         connect_or_delete(linkedlist[para->num], para->num);
         //printf("id = %d\n", para->num);
-        sleep(2);
+        sleep(5);
     }
     return NULL;
 }

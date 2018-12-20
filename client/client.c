@@ -11,7 +11,7 @@
 #define PORT 33333                                                    // master端开的端口
 #define PORT1 9999                                                    // client端开的端口
 #define PORT2 33334                                                   // master端开的接收警报信息的端口
-#define host "192.168.1.158"                                          // master端的ip
+#define host "192.168.1.157"                                          // master端的ip
 #define INS 6                                                         // 脚本个数
 #define MAX_SIZE 1024                                                 // 单次发送文件的最大字节数
 
@@ -44,7 +44,7 @@ char file_log[INS][20] = {"./Log/Mem.log", "./Log/Disk.log", "./Log/CPU.log",
                         "./Log/Sys.log", "./Log/User.log", "./Log/MPD.log"};
 char script_name[][50] = {"bash ../shell/MemLog.sh 20", "bash ../shell/DiskLog.sh", "bash ../shell/CPULog.sh", 
                            "bash ../shell/SysInfo.sh", "bash ../shell/Users.sh", "bash ../shell/MPD.sh"};
-int sleep_time[INS] = {5, 5, 5, 5, 5, 5};
+int sleep_time[INS] = {5, 60, 5, 5, 60, 5};
 
 // 检测是否有报警信息
 void warning_detecte(int num, char *buffer) {
