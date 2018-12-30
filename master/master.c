@@ -50,17 +50,17 @@ void insert(LinkedList head, Node *node) {
 // 输出链表head的所有节点
 void output(LinkedList head, int num) {
     if (head->next == NULL) {
-        printf("linkedlist %d is empty\n", num);
+        DBG("linkedlist %d is empty\n", num);
         return ;
     }
-    printf("linkedlist %d has %d node\n", num, queue[num]);
+    DBG("linkedlist %d has %d node\n", num, queue[num]);
     Node *p = head->next;
     char logfile[20];
     while (p) {
-        printf("%s:%d\n", inet_ntoa(p->addr.sin_addr), ntohs(p->addr.sin_port));
+        DBG("%s:%d\n", inet_ntoa(p->addr.sin_addr), ntohs(p->addr.sin_port));
         p = p->next;
     }
-    printf("\n");
+    DBG("\n");
     return ;
 }
 
@@ -81,7 +81,7 @@ int find_min(int N, int *arr) {
 int get_conf_value(char *pathname, char *key_name, char *value) {
     FILE *fp = NULL;
     if ((fp = fopen (pathname, "r")) == NULL) {
-        printf ("pathname NULL!\n");
+        DBG ("pathname NULL!\n");
         exit(0);
     }
     size_t len = 0;
@@ -148,7 +148,7 @@ void delete_node(LinkedList head, Node *del, int pid) {
     q = head->next;
     while (q) {
         if (q->addr.sin_addr.s_addr == del->addr.sin_addr.s_addr) {
-            printf("delete %s:%d\n", inet_ntoa(q->addr.sin_addr), ntohs(q->addr.sin_port));
+            DBG("delete %s:%d\n", inet_ntoa(q->addr.sin_addr), ntohs(q->addr.sin_port));
             p->next = q->next;
             free(q);
             queue[pid]--;
@@ -170,7 +170,7 @@ int connect_client(Node *p) {
         return 0;
     }
     char port[10] = {0};
-    get_conf_value("./config.conf", "port", port);
+    get_conf_value("/etc/gpx_pihealth.conf", "port", port);
     addr.sin_family = AF_INET;
     addr.sin_port = htons(atoi(port));
     addr.sin_addr.s_addr = p->addr.sin_addr.s_addr;
@@ -191,7 +191,7 @@ void recv_file(int sockfd, char *str, Node *p) {
         if (recv(sockfd, &recode, 4, 0) <= 0) {
             break ;
         }
-        printf("receive recode %d\n", recode);
+        DBG("receive recode %d\n", recode);
         int server_temp = connect_client(p);
         if (server_temp == 0) {
             close(server_temp);
@@ -201,7 +201,7 @@ void recv_file(int sockfd, char *str, Node *p) {
         char buffer[MAX_SIZE];
         char addr[80];
         sprintf(addr, "%s/%s", str, file_log[recode - 100]);
-        printf("start receive file %s\n", addr);
+        DBG("start receive file %s\n", addr);
         FILE *file = fopen(addr, "a+");
         if (file == NULL) {
             fclose(file);
@@ -212,7 +212,7 @@ void recv_file(int sockfd, char *str, Node *p) {
             fprintf(file, "%s", buffer + 1);
             memset(buffer, 0, sizeof(buffer));
         }
-        printf("finish receive file %s\n", addr);
+        DBG("finish receive file %s\n", addr);
         fclose(file);
         close(server_temp);
     }
@@ -223,16 +223,16 @@ void recv_file(int sockfd, char *str, Node *p) {
 // 遍历链表, 判断是否可以连接到客户端, 连接不到的删除
 void connect_or_delete(LinkedList head, int pid) {
     if (head->next == NULL) {
-        //printf("NULL %d\n", pid);
+        //DBG("NULL %d\n", pid);
         return ;
     }
     Node *p, *temp;
     p = head->next;
     int sockfd;
     while (p) {
-        //printf("%s\n", inet_ntoa(p->addr.sin_addr));
+        //DBG("%s\n", inet_ntoa(p->addr.sin_addr));
         if ((sockfd = connect_client(p)) == 0) {
-            //printf("connect error\n");
+            //DBG("connect error\n");
             pthread_mutex_lock(&mut[pid]);
             temp = p->next;
             delete_node(head, p, pid);
@@ -276,7 +276,7 @@ void *warn_func(void *argv) {
         }
         char addr[50];
         sprintf(addr, "%s/%s", str, file_log[recode]);
-        printf("start receive warning file %s\n", addr);
+        DBG("start receive warning file %s\n", addr);
         FILE *file = fopen(addr, "a+");
         if (file == NULL) {
             fclose(file);
@@ -286,7 +286,7 @@ void *warn_func(void *argv) {
         char buffer[MAX_SIZE];
         recv(server_temp, buffer, MAX_SIZE, 0);
         fwrite(buffer, strlen(buffer), 1, file);
-        printf("finish receive warning file %s\n", addr);
+        DBG("finish receive warning file %s\n", addr);
         fclose(file);
         close(server_temp);
     }
@@ -295,85 +295,94 @@ void *warn_func(void *argv) {
 }
 
 int main() {
-    //freopen("in.in", "r", stdin);
-    init_linkedlist(INS);
-    pthread_t t[INS + 1];
-    Mypara para[INS + 1];
-    char value[20] = {0}, start[10] = {0}, finish[10] = {0}, port[10] = {0};
-    get_conf_value("./config.conf", "prename", value);
-    get_conf_value("./config.conf", "start", start);
-    get_conf_value("./config.conf", "finish", finish);
-    get_conf_value("./config.conf", "port", port);
-    for (int i = atoi(start); i <= atoi(finish); i++) {
-        char ip[100];
-        sprintf(ip, "%s.%d", value, i);
-        struct sockaddr_in addr;
-        addr.sin_port = htons(atoi(port));
-        addr.sin_addr.s_addr = inet_addr(ip);
-        int sub = find_min(INS, queue);
-        Node *p;
-        p = (Node *)malloc(sizeof(Node));
-        p->addr = addr;
-        p->next = NULL;
-        insert(linkedlist[sub], p);
-        queue[sub]++;
-    }
-    /*
-    for (int i = 0; i < INS; i++) {
-        printf("%d ", queue[i]);
-        printf("   ......\n");
-        output(linkedlist[i], i);
-    }
-    */
-    for (int i = 0; i < INS; i++) {
-        para[i].num = i;
-        if (pthread_create(&t[i], NULL, func, (void *)&para[i]) == -1) {
-            printf("error\n");
+    int pid = fork();
+    if (!pid) {
+         //freopen("in.in", "r", stdin);
+        init_linkedlist(INS);
+        pthread_t t[INS + 1];
+        Mypara para[INS + 1];
+        char value[20] = {0}, start[10] = {0}, finish[10] = {0}, port[10] = {0};
+        get_conf_value("/etc/gpx_pihealth.conf", "prename", value);
+        get_conf_value("/etc/gpx_pihealth.conf", "start", start);
+        get_conf_value("/etc/gpx_pihealth.conf", "finish", finish);
+        get_conf_value("/etc/gpx_pihealth.conf", "port", port);
+        for (int i = atoi(start); i <= atoi(finish); i++) {
+            char ip[100];
+            sprintf(ip, "%s.%d", value, i);
+            struct sockaddr_in addr;
+            addr.sin_port = htons(atoi(port));
+            addr.sin_addr.s_addr = inet_addr(ip);
+            int sub = find_min(INS, queue);
+            Node *p;
+            p = (Node *)malloc(sizeof(Node));
+            p->addr = addr;
+            p->next = NULL;
+            insert(linkedlist[sub], p);
+            queue[sub]++;
+        }
+        /*
+        for (int i = 0; i < INS; i++) {
+            DBG("%d ", queue[i]);
+            DBG("   ......\n");
+            output(linkedlist[i], i);
+        }
+        */
+        for (int i = 0; i < INS; i++) {
+            para[i].num = i;
+            if (pthread_create(&t[i], NULL, func, (void *)&para[i]) == -1) {
+                DBG("error\n");
+                exit(1);
+            }
+        }
+        sleep(10);                                            // 睡10秒, 等待队列初始化完成
+        pthread_t warn;                                       // 开一个线程, 用来接收警报信息
+        if (pthread_create(&warn, NULL, warn_func, NULL) == -1) {
+            DBG("error\n");
             exit(1);
         }
+        int server_listen = create_listen(PORT);
+        while (1) {
+            struct sockaddr_in client_addr;
+            socklen_t len = sizeof(client_addr);
+            int socketfd;
+            if ((socketfd = accept(server_listen, (struct sockaddr*)&client_addr, &len)) < 0) {
+                close(socketfd);
+                perror("accept error");
+                continue;
+            }
+            if (exist(client_addr)) {
+                close(socketfd);
+                DBG("already exists\n");
+                continue;
+            }
+            int sub = find_min(INS, queue);
+            Node *p;
+            p = (Node *)malloc(sizeof(Node));
+            p->addr = client_addr;
+            p->next = NULL;
+            pthread_mutex_lock(&mut[sub]);
+            insert(linkedlist[sub], p);
+            queue[sub]++;
+            pthread_mutex_unlock(&mut[sub]);
+            DBG("insert into %d linkedlist\n", sub);
+            output(linkedlist[sub], sub);
+            close(socketfd);
+        }
+        close(server_listen);
+        /*
+        pthread_join(t[0], NULL);
+        pthread_join(t[1], NULL);
+        pthread_join(t[2], NULL);
+        pthread_join(t[3], NULL);
+        pthread_join(t[4], NULL);
+        */
     }
-    sleep(10);                                            // 睡10秒, 等待队列初始化完成
-    pthread_t warn;                                       // 开一个线程, 用来接收警报信息
-    if (pthread_create(&warn, NULL, warn_func, NULL) == -1) {
-        printf("error\n");
+    if (pid > 0) {
+        FILE *fp = fopen("/etc/gpx_pihealth.pid", "w");
+        fprintf(fp, "%d", pid);
+        fclose(fp);
         exit(1);
     }
-    int server_listen = create_listen(PORT);
-    while (1) {
-        struct sockaddr_in client_addr;
-        socklen_t len = sizeof(client_addr);
-        int socketfd;
-        if ((socketfd = accept(server_listen, (struct sockaddr*)&client_addr, &len)) < 0) {
-            close(socketfd);
-            perror("accept error");
-            continue;
-        }
-        if (exist(client_addr)) {
-            close(socketfd);
-            printf("already exists\n");
-            continue;
-        }
-        int sub = find_min(INS, queue);
-        Node *p;
-        p = (Node *)malloc(sizeof(Node));
-        p->addr = client_addr;
-        p->next = NULL;
-        pthread_mutex_lock(&mut[sub]);
-        insert(linkedlist[sub], p);
-        queue[sub]++;
-        pthread_mutex_unlock(&mut[sub]);
-        printf("insert into %d linkedlist\n", sub);
-        output(linkedlist[sub], sub);
-        close(socketfd);
-    }
-    close(server_listen);
-    /*
-    pthread_join(t[0], NULL);
-    pthread_join(t[1], NULL);
-    pthread_join(t[2], NULL);
-    pthread_join(t[3], NULL);
-    pthread_join(t[4], NULL);
-    */
     return 0;
 }
 
@@ -382,7 +391,7 @@ void *func(void *argv) {
     para = (Mypara *)argv;
     while (1) {
         connect_or_delete(linkedlist[para->num], para->num);
-        //printf("id = %d\n", para->num);
+        //DBG("id = %d\n", para->num);
         sleep(5);
     }
     return NULL;

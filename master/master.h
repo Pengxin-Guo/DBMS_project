@@ -30,5 +30,10 @@
 #include <time.h>
 #include <stdarg.h>
 
+#ifdef _DEBUG
+#define DBG(fmt , args...)  printf(fmt, ##args)
+#else
+#define DBG(fmt , args...)
+#endif
 
 #endif
